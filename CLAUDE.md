@@ -98,6 +98,16 @@ git checkout -b <new-branch-name>
 
 Never create branch names with periods in them.
 
+### Agent worktrees
+
+Do not use Claude Code's built-in agent worktree isolation (`isolation: "worktree"` on Agent tool calls). When agents work in isolated worktree copies, their changes must be cherry-picked back, which causes merge conflicts when tasks touch overlapping files. In practice this is unreliable.
+
+Subagent-driven development works well when agents execute sequentially in the main repo, or when using manually-created git worktrees (via the `superpowers:using-git-worktrees` skill). Prefer those approaches.
+
+### Bash and git commands
+
+Never combine `cd` and `git` in a single compound command (e.g., `cd some/dir && git status`). This triggers a Claude Code security check that requires user approval. Instead, run `cd` and `git` as separate Bash calls.
+
 ### Commit messages
 
 - Focus on "why" rather than "what"
