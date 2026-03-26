@@ -158,14 +158,28 @@ for settings_file in "$CODE_DIR"/*/.claude/settings.local.json; do
   fi
 done
 
-# --- Phase 3: Verify symlinks ---
+# --- Phase 3: Verify symlinks (or copy in sandbox) ---
 
-echo -e "${BLUE}Phase 3: Verifying symlinks...${NC}"
+IS_SANDBOX=false
+if [ -f "/.dockerenv" ]; then
+  IS_SANDBOX=true
+  echo -e "${BLUE}Phase 3: Copying files (sandbox mode — read-only ~/.claude)...${NC}"
+else
+  echo -e "${BLUE}Phase 3: Verifying symlinks...${NC}"
+fi
 
-create_symlink() {
+link_or_copy() {
   local source="$1"
   local target="$2"
   local label="$3"
+
+  mkdir -p "$(dirname "$target")"
+
+  if [ "$IS_SANDBOX" = true ]; then
+    cp "$source" "$target"
+    echo -e "  ${GREEN}✓${NC} $label copied"
+    return
+  fi
 
   if [ -L "$target" ]; then
     current=$(readlink "$target")
@@ -181,14 +195,14 @@ create_symlink() {
     mv "$target" "${target}.bak"
   fi
 
-  mkdir -p "$(dirname "$target")"
   ln -s "$source" "$target"
   symlinks_created_count=$((symlinks_created_count + 1))
   echo -e "  ${GREEN}✓${NC} $label → $source"
 }
 
-create_symlink "$DEV_REPO/settings.json" "$CLAUDE_HOME/settings.json" "settings.json"
-create_symlink "$DEV_REPO/CLAUDE.md" "$CLAUDE_HOME/CLAUDE.md" "CLAUDE.md"
+link_or_copy "$DEV_REPO/settings.json" "$CLAUDE_HOME/settings.json" "settings.json"
+link_or_copy "$DEV_REPO/CLAUDE.md" "$CLAUDE_HOME/CLAUDE.md" "CLAUDE.md"
+link_or_copy "$DEV_REPO/bin/statusline-command.sh" "$CLAUDE_HOME/statusline-command.sh" "statusline-command.sh"
 
 # Symlink commands
 if [ -d "$DEV_REPO/commands" ]; then
@@ -196,7 +210,7 @@ if [ -d "$DEV_REPO/commands" ]; then
   for cmd_file in "$DEV_REPO/commands"/*.md; do
     [ -f "$cmd_file" ] || continue
     cmd_name="$(basename "$cmd_file")"
-    create_symlink "$cmd_file" "$CLAUDE_HOME/commands/$cmd_name" "commands/$cmd_name"
+    link_or_copy "$cmd_file" "$CLAUDE_HOME/commands/$cmd_name" "commands/$cmd_name"
   done
 fi
 
@@ -205,5 +219,5 @@ fi
 echo ""
 echo -e "${BLUE}=== Sync Complete ===${NC}"
 echo -e "  Global permissions: $(jq '.permissions.allow | length' "$DEV_REPO/settings.json")"
-echo -e "  Symlinks verified: settings.json, CLAUDE.md, commands/"
+echo -e "  Symlinks verified: settings.json, CLAUDE.md, statusline-command.sh, commands/"
 echo -e "${BLUE}Done.${NC}"
