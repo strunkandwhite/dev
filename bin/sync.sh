@@ -214,10 +214,28 @@ if [ -d "$DEV_REPO/commands" ]; then
   done
 fi
 
+# --- Phase 4: Patch settings.json for current environment ---
+
+echo -e "${BLUE}Phase 4: Patching settings for environment...${NC}"
+
+# Ensure statusLine config points to the right path
+STATUSLINE_PATH="$CLAUDE_HOME/statusline-command.sh"
+CURRENT_CMD=$(jq -r '.statusLine.command // empty' "$CLAUDE_HOME/settings.json")
+
+if [ "$CURRENT_CMD" != "bash $STATUSLINE_PATH" ]; then
+  jq --arg cmd "bash $STATUSLINE_PATH" \
+    '.statusLine = {"type": "command", "command": $cmd}' \
+    "$CLAUDE_HOME/settings.json" > "$CLAUDE_HOME/settings.json.tmp"
+  mv "$CLAUDE_HOME/settings.json.tmp" "$CLAUDE_HOME/settings.json"
+  echo -e "  ${GREEN}✓${NC} statusLine command → $STATUSLINE_PATH"
+else
+  echo -e "  ${GREEN}✓${NC} statusLine command already correct"
+fi
+
 # --- Summary ---
 
 echo ""
 echo -e "${BLUE}=== Sync Complete ===${NC}"
-echo -e "  Global permissions: $(jq '.permissions.allow | length' "$DEV_REPO/settings.json")"
+echo -e "  Global permissions: $(jq '.permissions.allow | length' "$CLAUDE_HOME/settings.json")"
 echo -e "  Symlinks verified: settings.json, CLAUDE.md, statusline-command.sh, commands/"
 echo -e "${BLUE}Done.${NC}"
