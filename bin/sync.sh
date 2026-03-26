@@ -200,7 +200,44 @@ link_or_copy() {
   echo -e "  ${GREEN}✓${NC} $label → $source"
 }
 
-link_or_copy "$DEV_REPO/settings.json" "$CLAUDE_HOME/settings.json" "settings.json"
+link_or_copy_dir() {
+  local source="${1%/}"
+  local target="${2%/}"
+  local label="$3"
+
+  mkdir -p "$(dirname "$target")"
+
+  if [ "$IS_SANDBOX" = true ]; then
+    rm -rf "$target"
+    cp -r "$source" "$target"
+    echo -e "  ${GREEN}✓${NC} $label copied"
+    return
+  fi
+
+  if [ -L "$target" ]; then
+    current=$(readlink "$target")
+    if [ "$current" = "$source" ]; then
+      echo -e "  ${GREEN}✓${NC} $label already linked"
+      return
+    else
+      echo -e "  ${YELLOW}⚠${NC} $label points to $current, updating..."
+      rm "$target"
+    fi
+  elif [ -d "$target" ]; then
+    echo -e "  ${YELLOW}⚠${NC} $label exists as directory, replacing with link..."
+    rm -rf "$target"
+  fi
+
+  ln -s "$source" "$target"
+  symlinks_created_count=$((symlinks_created_count + 1))
+  echo -e "  ${GREEN}✓${NC} $label → $source"
+}
+
+if [ "$IS_SANDBOX" = true ] && [ -f "$DEV_REPO/settings.sandbox.json" ]; then
+  link_or_copy "$DEV_REPO/settings.sandbox.json" "$CLAUDE_HOME/settings.json" "settings.json (sandbox)"
+else
+  link_or_copy "$DEV_REPO/settings.json" "$CLAUDE_HOME/settings.json" "settings.json"
+fi
 link_or_copy "$DEV_REPO/CLAUDE.md" "$CLAUDE_HOME/CLAUDE.md" "CLAUDE.md"
 link_or_copy "$DEV_REPO/bin/statusline-command.sh" "$CLAUDE_HOME/statusline-command.sh" "statusline-command.sh"
 
@@ -212,6 +249,52 @@ if [ -d "$DEV_REPO/commands" ]; then
     cmd_name="$(basename "$cmd_file")"
     link_or_copy "$cmd_file" "$CLAUDE_HOME/commands/$cmd_name" "commands/$cmd_name"
   done
+fi
+
+# Sync skills (symlink on host, copy in sandbox)
+if [ -d "$DEV_REPO/skills" ]; then
+  mkdir -p "$CLAUDE_HOME/skills"
+  for skill_dir in "$DEV_REPO/skills"/*/; do
+    [ -d "$skill_dir" ] || continue
+    skill_name="$(basename "$skill_dir")"
+    link_or_copy_dir "$skill_dir" "$CLAUDE_HOME/skills/$skill_name" "skills/$skill_name"
+  done
+fi
+
+# Sync plugins (always copy — vendored snapshots, not live-edited)
+if [ -d "$DEV_REPO/plugins/cache" ]; then
+  for marketplace_dir in "$DEV_REPO/plugins/cache"/*/; do
+    [ -d "$marketplace_dir" ] || continue
+    marketplace="$(basename "$marketplace_dir")"
+    for plugin_dir in "$marketplace_dir"/*/; do
+      [ -d "$plugin_dir" ] || continue
+      plugin="$(basename "$plugin_dir")"
+      for version_dir in "$plugin_dir"/*/; do
+        [ -d "$version_dir" ] || continue
+        version="$(basename "$version_dir")"
+        target="$CLAUDE_HOME/plugins/cache/$marketplace/$plugin/$version"
+        mkdir -p "$(dirname "$target")"
+        rm -rf "$target"
+        cp -r "${version_dir%/}" "$target"
+        echo -e "  ${GREEN}✓${NC} plugins/$plugin/$version copied"
+      done
+    done
+  done
+fi
+
+# Generate installed_plugins.json from template
+if [ -f "$DEV_REPO/plugins/installed_plugins.template.json" ]; then
+  mkdir -p "$CLAUDE_HOME/plugins"
+  sed "s|__CLAUDE_HOME__|$CLAUDE_HOME|g" "$DEV_REPO/plugins/installed_plugins.template.json" \
+    > "$CLAUDE_HOME/plugins/installed_plugins.json"
+  echo -e "  ${GREEN}✓${NC} installed_plugins.json generated"
+fi
+
+# Copy static plugin config
+if [ -f "$DEV_REPO/plugins/config.json" ]; then
+  mkdir -p "$CLAUDE_HOME/plugins"
+  cp "$DEV_REPO/plugins/config.json" "$CLAUDE_HOME/plugins/config.json"
+  echo -e "  ${GREEN}✓${NC} plugins/config.json copied"
 fi
 
 # --- Phase 4: Patch settings.json for current environment ---
@@ -237,5 +320,5 @@ fi
 echo ""
 echo -e "${BLUE}=== Sync Complete ===${NC}"
 echo -e "  Global permissions: $(jq '.permissions.allow | length' "$CLAUDE_HOME/settings.json")"
-echo -e "  Symlinks verified: settings.json, CLAUDE.md, statusline-command.sh, commands/"
+echo -e "  Synced: settings.json, CLAUDE.md, statusline-command.sh, commands/, skills/, plugins/"
 echo -e "${BLUE}Done.${NC}"
