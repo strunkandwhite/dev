@@ -1,11 +1,11 @@
 ---
 name: deep-clean
-description: Use when the codebase needs a thorough health audit — after completing a milestone, batch of features, or whenever code quality may have drifted. Covers architecture, security, performance, code quality, and test quality.
+description: Use when the codebase needs a thorough health audit — after completing a milestone, batch of features, or whenever code quality may have drifted. Covers architecture, security, performance, code quality, test quality, and documentation.
 ---
 
 # Deep Clean
 
-Comprehensive codebase health audit combining automated tooling with parallel agent-driven review across 5 domains.
+Comprehensive codebase health audit combining automated tooling with parallel agent-driven review across 6 domains.
 
 ## When to Use
 
@@ -27,7 +27,7 @@ digraph deep_clean {
     "Run automated tools" [shape=box];
     "Tools pass?" [shape=diamond];
     "Fix tool failures" [shape=box];
-    "Dispatch 5 review agents" [shape=box];
+    "Dispatch 6 review agents" [shape=box];
     "Collect and merge findings" [shape=box];
     "Present findings by category" [shape=box];
     "Discuss and triage with user" [shape=box];
@@ -40,8 +40,8 @@ digraph deep_clean {
     "Run automated tools" -> "Tools pass?";
     "Tools pass?" -> "Fix tool failures" [label="no"];
     "Fix tool failures" -> "Run automated tools";
-    "Tools pass?" -> "Dispatch 5 review agents" [label="yes"];
-    "Dispatch 5 review agents" -> "Collect and merge findings";
+    "Tools pass?" -> "Dispatch 6 review agents" [label="yes"];
+    "Dispatch 6 review agents" -> "Collect and merge findings";
     "Collect and merge findings" -> "Present findings by category";
     "Present findings by category" -> "Discuss and triage with user";
     "Discuss and triage with user" -> "Write implementation plan";
@@ -58,7 +58,7 @@ Run the project's quality gate. For this project: `pnpm precommit` (typecheck, l
 
 ### Step 2: Parallel Agent Dispatch
 
-Dispatch 5 agents concurrently using the Agent tool, one per domain. Each agent gets:
+Dispatch 6 agents concurrently using the Agent tool, one per domain. Each agent gets:
 - Its domain-specific prompt template (see agent prompt files in this directory)
 - The automated tool output summary
 - Instructions to read broadly, not spot-check
@@ -71,12 +71,13 @@ Dispatch 5 agents concurrently using the Agent tool, one per domain. Each agent 
 3. **Performance** — Query patterns, rendering, hot paths, caching
 4. **Code Quality** — Dead code, duplication, complexity, naming
 5. **Test Quality** — Meaningful assertions, coverage gaps, mock fidelity
+6. **Documentation** — CLAUDE.md and README.md accuracy against codebase and plan docs
 
 Use `subagent_type: "general-purpose"` for all agents. Each agent prompt is in this skill directory.
 
 ### Step 3: Report Assembly
 
-Collect findings from all 5 agents. Deduplicate — if two agents flag the same file/issue, keep the more specific finding and note which domains identified it. When agents disagree on severity, use the higher severity.
+Collect findings from all 6 agents. Deduplicate — if two agents flag the same file/issue, keep the more specific finding and note which domains identified it. When agents disagree on severity, use the higher severity.
 
 Organize findings into a flat table by category, with a severity column. This is more scannable than nested severity sub-headings:
 
@@ -160,6 +161,9 @@ One paragraph describing the scope and outcome.
 ### Test Quality (N fixes)
 (same table structure)
 
+### Documentation (N fixes)
+(same table structure)
+
 ## Test Impact
 
 - **Before:** X tests (Y passing, Z skipped)
@@ -197,3 +201,4 @@ Each agent has a dedicated prompt template in this directory:
 - `performance-agent.md`
 - `code-quality-agent.md`
 - `test-quality-agent.md`
+- `documentation-agent.md`
